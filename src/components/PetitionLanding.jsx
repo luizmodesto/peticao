@@ -14,6 +14,8 @@ import {
   BookOpen
 } from 'lucide-react';
 import { validarTituloEleitor } from '@/lib/validarTituloEleitor';
+import SignatureCounter from '@/components/SignatureCounter';
+import ConstitutionalNoticeModal from '@/components/ConstitutionalNoticeModal';
 
 const ESTADOS_BRASIL = [
   { sigla: 'AC', nome: 'Acre' }, { sigla: 'AL', nome: 'Alagoas' }, { sigla: 'AP', nome: 'Amapá' },
@@ -42,6 +44,9 @@ export default function PetitionLanding({ onSubmit }) {
   
   // Controle do Modal dos Termos da Proposta
   const [modalTermosAberto, setModalTermosAberto] = useState(false);
+
+  // Pop-up Inicial de Aviso Constitucional (abre automaticamente na carga)
+  const [modalConstitucionalAberto, setModalConstitucionalAberto] = useState(true);
 
   const handleTituloChange = (e) => {
     const rawVal = e.target.value.replace(/\D/g, '').slice(0, 12);
@@ -116,7 +121,11 @@ export default function PetitionLanding({ onSubmit }) {
   return (
     <div className="w-full max-w-3xl mx-auto py-2 sm:py-6 px-3 sm:px-6 animate-fade-in select-none">
       
-      {/* ======================================================== */}
+      {/* Pop-up Inicial de Aviso Constitucional (Abre Automaticamente) */}
+      <ConstitutionalNoticeModal
+        isOpen={modalConstitucionalAberto}
+        onClose={() => setModalConstitucionalAberto(false)}
+      />
       {/* CABEÇALHO DO DOCUMENTO OFICIAL                           */}
       {/* ======================================================== */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-md relative overflow-hidden mb-8">
@@ -230,6 +239,11 @@ export default function PetitionLanding({ onSubmit }) {
           </div>
         </div>
       </div>
+
+      {/* ======================================================== */}
+      {/* CONTADOR PÚBLICO DE ASSINATURAS (SUPABASE AGGREGATION)   */}
+      {/* ======================================================== */}
+      <SignatureCounter />
 
       {/* ======================================================== */}
       {/* FORMULÁRIO DE ASSINATURA ELETRÔNICA                      */}

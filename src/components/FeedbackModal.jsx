@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, AlertTriangle, XCircle, RotateCcw } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, RotateCcw, Mail } from 'lucide-react';
 
 /**
  * Modal de Feedback de Confirmação ou Erro da Petição
@@ -98,6 +98,16 @@ export default function FeedbackModal({
                 {isSuccess ? 'AUTENTICADO & REGISTRADO' : 'BLOQUEADO (DUPLICADO)'}
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Aviso de E-mail de Confirmação */}
+        {isSuccess && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs sm:text-sm flex items-center justify-center gap-2.5 animate-fade-in shadow-inner">
+            <Mail className="w-5 h-5 flex-shrink-0 text-emerald-400 animate-pulse" />
+            <span className="font-medium text-left">
+              A aguardar o envio... Um e-mail de confirmação foi enviado para o endereço cadastrado.
+            </span>
           </div>
         )}
 

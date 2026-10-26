@@ -65,7 +65,7 @@ CREATE POLICY "Restringir visualizacao para administradores"
     TO authenticated
     USING (true);
 
--- 8. Função agregada para contagem estatística oficial por Estado
+-- 8. Função agregada para contagem estatística oficial
 CREATE OR REPLACE FUNCTION public.obter_estatisticas_peticao()
 RETURNS TABLE (
     total_apoios bigint,
@@ -79,3 +79,23 @@ AS $$
         count(DISTINCT estado)::bigint AS total_estados
     FROM public.peticao_votos;
 $$;
+GRANT EXECUTE ON FUNCTION public.obter_estatisticas_peticao() TO anon, authenticated;
+
+-- 9. Função para contagem agrupada de votos por Estado (Dashboard)
+CREATE OR REPLACE FUNCTION public.obter_votos_por_estado()
+RETURNS TABLE (
+    estado varchar,
+    total bigint
+)
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+    SELECT 
+        estado,
+        count(*)::bigint AS total
+    FROM public.peticao_votos
+    GROUP BY estado
+    ORDER BY total DESC;
+$$;
+GRANT EXECUTE ON FUNCTION public.obter_votos_por_estado() TO anon, authenticated;
+
