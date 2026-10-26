@@ -87,18 +87,33 @@ export default function AdminPeticaoPage() {
       }
 
       // 2. Agrupamento por Estado
-      const { data: estadosData, error: errEstados } = await supabase.rpc('obter_votos_por_estado');
-      
       const mapaContagem = {};
       TODAS_UFS.forEach(uf => { mapaContagem[uf] = 0; });
 
-      if (!errEstados && Array.isArray(estadosData)) {
+      const { data: estadosData, error: errEstados } = await supabase.rpc('obter_votos_por_estado');
+      
+      let temDadosRpc = false;
+      if (!errEstados && Array.isArray(estadosData) && estadosData.length > 0) {
         estadosData.forEach((row) => {
           const uf = String(row.estado || '').toUpperCase();
           if (uf) {
             mapaContagem[uf] = Number(row.total || 0);
+            temDadosRpc = true;
           }
         });
+      }
+
+      // Se o RPC não retornou dados, realiza contagem direta na tabela peticao_votos
+      if (!temDadosRpc) {
+        const { data: votosRows } = await supabase.from('peticao_votos').select('estado');
+        if (Array.isArray(votosRows) && votosRows.length > 0) {
+          votosRows.forEach((row) => {
+            const uf = String(row.estado || '').toUpperCase();
+            if (uf) {
+              mapaContagem[uf] = (mapaContagem[uf] || 0) + 1;
+            }
+          });
+        }
       }
 
       setVotosPorEstado(mapaContagem);
