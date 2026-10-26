@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ShieldCheck, User, CreditCard, ArrowRight, AlertCircle, Lock } from 'lucide-react';
+import { validarTituloEleitor } from '@/lib/validarTituloEleitor';
 
 /**
  * Formulário Inicial de Identificação do Eleitor
@@ -38,10 +39,9 @@ export default function IdentificationForm({ onSubmit }) {
       return;
     }
 
-    // Validação estrita por Regex (10 a 12 dígitos numéricos)
-    const regexTitulo = /^[0-9]{10,12}$/;
-    if (!regexTitulo.test(tituloLimpo)) {
-      setErro('Título de Eleitor inválido. Digite entre 10 e 12 números.');
+    // Validação matemática do Título de Eleitor (Módulo 11 oficial do TSE)
+    if (!validarTituloEleitor(tituloLimpo)) {
+      setErro('Título de eleitor inválido ou não correspondente ao estado selecionado.');
       return;
     }
 

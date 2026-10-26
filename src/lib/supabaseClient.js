@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { validarTituloEleitorDetalhado, MENSAGEM_ERRO_TITULO } from './validarTituloEleitor';
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -45,22 +46,41 @@ export async function registrarApoioPeticao({
   const emailLimpo = String(email || '').trim().toLowerCase();
   const codigo = String(codigoVotado || '').trim().toUpperCase();
 
-  // Validação no Frontend
+  // Validação do Nome
   if (!nomeLimpo || nomeLimpo.length < 3) {
     return { success: false, error: 'Por favor, informe seu nome completo (mínimo 3 caracteres).' };
   }
 
-  if (!/^[0-9]{10,12}$/.test(tituloLimpo)) {
-    return { success: false, error: 'Título de Eleitor inválido (deve conter de 10 a 12 números).' };
-  }
-
-  if (!ufLimpa || ufLimpa.length !== 2) {
-    return { success: false, error: 'Selecione o Estado (UF) correspondente.' };
+  // Validação Oficial do TSE (Módulo 11) e Validação Cruzada com o Estado (UF)
+  const validacaoTitulo = validarTituloEleitorDetalhado(tituloLimpo, ufLimpa);
+  if (!validacaoTitulo.valido) {
+    return { success: false, error: MENSAGEM_ERRO_TITULO };
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(emailLimpo)) {
     return { success: false, error: 'Por favor, informe um endereço de e-mail válido.' };
+  }
+
+  // Camada 1: Tenta registrar via Backend API Route (executando validação dupla)
+  if (typeof window !== 'undefined') {
+    try {
+      const resp = await fetch('/api/voto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: nomeLimpo,
+          tituloEleitor: tituloLimpo,
+          estado: ufLimpa,
+          email: emailLimpo,
+          codigoVotado: codigo,
+        }),
+      });
+      const resultadoApi = await resp.json();
+      return resultadoApi;
+    } catch (apiErr) {
+      console.warn('[SupabaseClient] /api/voto não respondeu, tentando fallback direto:', apiErr);
+    }
   }
 
   // Fallback para modo demonstração local se chaves reais não estiverem presentes

@@ -13,6 +13,7 @@ import {
   Scale,
   BookOpen
 } from 'lucide-react';
+import { validarTituloEleitor } from '@/lib/validarTituloEleitor';
 
 const ESTADOS_BRASIL = [
   { sigla: 'AC', nome: 'Acre' }, { sigla: 'AL', nome: 'Alagoas' }, { sigla: 'AP', nome: 'Amapá' },
@@ -73,13 +74,14 @@ export default function PetitionLanding({ onSubmit }) {
       return;
     }
 
-    if (!/^[0-9]{10,12}$/.test(tituloLimpo)) {
-      setErro('Título de Eleitor inválido. Digite entre 10 e 12 números.');
+    if (!estado) {
+      setErro('Selecione o Estado (UF) do seu domicílio eleitoral.');
       return;
     }
 
-    if (!estado) {
-      setErro('Selecione o Estado (UF) do seu domicílio eleitoral.');
+    // Validação Algorítmica Oficial do TSE (Módulo 11) e Validação Cruzada com o Estado (UF)
+    if (!validarTituloEleitor(tituloLimpo, estado)) {
+      setErro('Título de eleitor inválido ou não correspondente ao estado selecionado.');
       return;
     }
 
