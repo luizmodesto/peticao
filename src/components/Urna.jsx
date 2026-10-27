@@ -122,11 +122,21 @@ export default function Urna({ eleitor, onBack }) {
       });
     } else {
       urnaAudio.playErrorBeep();
+      const msgErroCompleta = resultado.details
+        ? `${resultado.error} [Detalhes: ${resultado.details}]`
+        : (resultado.error || 'Ocorreu um erro no processamento. Tente novamente.');
+
+      console.error('[Urna:SubmissionFail]', {
+        error: resultado.error,
+        details: resultado.details,
+        code: resultado.code,
+      });
+
       setModalState({
         isOpen: true,
         type: 'error',
         title: 'Não foi possível registrar o apoio',
-        message: resultado.error || 'Ocorreu um erro no processamento. Tente novamente.',
+        message: msgErroCompleta,
       });
     }
   };

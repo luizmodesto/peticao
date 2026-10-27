@@ -1,6 +1,9 @@
 import './globals.css';
 import SecurityWrapper from '@/components/SecurityWrapper';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export const metadata = {
   title: 'Petição Nacional - Urna Eletrônica Oficial',
   description: 'Sistema interativo de petição pública com validação de título de eleitor e simulação realista de Urna Eletrônica.',

@@ -3,6 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import { validarTituloEleitorDetalhado, MENSAGEM_ERRO_TITULO } from '@/lib/validarTituloEleitor';
 import { enviarEmailConfirmacaoAssinatura } from '@/lib/emailService';
 
+// Desativa cache estático da rota na Vercel
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   'https://hbwianqvbhzgxfihykhh.supabase.co';
@@ -30,6 +35,7 @@ export async function POST(request) {
       email: rawBody?.email,
       codigoVotado: rawBody?.codigoVotado,
       timestamp: new Date().toISOString(),
+      usingServiceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     });
 
     const { nome, tituloEleitor, estado, municipio, email, codigoVotado } = rawBody || {};
@@ -95,9 +101,7 @@ export async function POST(request) {
 
     console.log('[Audit:2:SupabaseInsert:Payload]', payloadSupabase);
 
-    // Inserção no Supabase com mapeamento estrito das 6 colunas.
-    // NOTA DE AUDITORIA: Não encadear .select() pois a política de RLS pública
-    // permite apenas INSERT para papéis anônimos (SELECT é restrito aos administradores).
+    // Inserção no Supabase com mapeamento estrito das colunas
     const { data: dbData, error: dbError } = await supabase
       .from('peticao_votos')
       .insert([payloadSupabase]);
@@ -105,12 +109,16 @@ export async function POST(request) {
     // =======================================================================
     // LOG DE RASTREIO 2: Resposta completa (data/error) retornada pelo Supabase
     // =======================================================================
-    console.log('[Audit:2:SupabaseResponse] Resposta completa do Supabase após insert:', {
-      data: dbData,
-      error: dbError,
-    });
-
     if (dbError) {
+      console.error('[Audit:SupabaseError:Details] Erro detalhado no insert:', {
+        code: dbError.code,
+        message: dbError.message,
+        details: dbError.details,
+        hint: dbError.hint,
+        table: 'peticao_votos',
+        tituloMascarado: `${tituloLimpo.slice(0, 2)}****${tituloLimpo.slice(-3)}`,
+      });
+
       // Código PostgreSQL 23505 = unique_violation (violação da restrição UNIQUE no Título)
       const isDuplicateKey =
         dbError.code === '23505' ||
@@ -125,28 +133,49 @@ export async function POST(request) {
             success: false,
             isDuplicate: true,
             error: 'Este título de eleitor já registrou apoio nesta petição.',
+            code: dbError.code,
           },
           { status: 409 }
         );
       }
 
-      console.error('[Audit:SupabaseError] Erro ao inserir na tabela peticao_votos:', dbError);
+      // Violação de RLS (Row-Level Security)
+      if (dbError.code === '42501' || dbError.message?.toLowerCase().includes('row-level security')) {
+        console.error('[Audit:RLS_Blocked] Inserção bloqueada por política de segurança RLS:', dbError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Operação bloqueada por política de segurança RLS do banco de dados. Configure a SUPABASE_SERVICE_ROLE_KEY ou revise as políticas.',
+            code: dbError.code,
+            details: dbError.message,
+          },
+          { status: 403 }
+        );
+      }
+
       return NextResponse.json(
-        { success: false, error: 'Erro ao registrar assinatura no banco de dados: ' + dbError.message },
+        {
+          success: false,
+          error: 'Erro ao registrar assinatura no banco de dados: ' + dbError.message,
+          code: dbError.code,
+          details: dbError.details || dbError.hint || null,
+        },
         { status: 500 }
       );
     }
 
+    console.log('[Audit:2:SupabaseInsert:Success] Assinatura gravada com sucesso no Supabase.');
+
     // =======================================================================
-    // 5. DISPARO DO E-MAIL: INVOCADO EXCLUSIVAMENTE APÓS SUCESSO NO SUPABASE
-    //    Garante que nenhum e-mail seja disparado em caso de erro no banco.
-    //    Injeta explicitamente a variável validada `emailLimpo` no campo `to`.
+    // 5. DISPARO DO E-MAIL NÃO BLOQUEANTE:
+    //    Invocado APÓS sucesso no banco de dados.
+    //    Protegido com timeout estrito para NUNCA travar a resposta da Vercel.
     // =======================================================================
     let emailResult = null;
     try {
       console.log('[Audit:3:EmailDispatch:Pre] Registro confirmado no banco. Invocando envio de e-mail para:', emailLimpo);
       
-      emailResult = await enviarEmailConfirmacaoAssinatura({
+      const emailPromise = enviarEmailConfirmacaoAssinatura({
         nome: nomeLimpo,
         email: emailLimpo,
         tituloEleitor: tituloLimpo,
@@ -155,12 +184,15 @@ export async function POST(request) {
         codigoVotado: codigo || '22',
       });
 
-      // =====================================================================
-      // LOG DE RASTREIO 3: Resposta do serviço de e-mail após a tentativa
-      // =====================================================================
-      console.log('[Audit:3:EmailDispatch:Post] Resposta completa do serviço de e-mail:', emailResult);
+      // Timeout de segurança de 3 segundos para prevenir timeout 504 da Vercel
+      const timeoutPromise = new Promise((resolve) =>
+        setTimeout(() => resolve({ success: false, timeout: true, error: 'Disparo de e-mail em background excedeu timeout limite.' }), 3000)
+      );
+
+      emailResult = await Promise.race([emailPromise, timeoutPromise]);
+      console.log('[Audit:3:EmailDispatch:Post] Resposta do envio de e-mail:', emailResult);
     } catch (emailException) {
-      // Exceção de rede no provedor de e-mail não cancela o voto auditado
+      // Exceção no provedor de e-mail não cancela o voto auditado
       console.error('[Audit:3:EmailDispatch:Exception] Falha não impeditiva no disparo do e-mail:', emailException);
       emailResult = { success: false, error: emailException.message };
     }
@@ -179,7 +211,7 @@ export async function POST(request) {
   } catch (err) {
     console.error('[Audit:FatalException] Erro interno crítico na API /api/voto:', err);
     return NextResponse.json(
-      { success: false, error: 'Erro interno ao processar validação do voto.' },
+      { success: false, error: 'Erro interno ao processar validação do voto: ' + err.message },
       { status: 500 }
     );
   }

@@ -15,7 +15,32 @@ export default function SignatureCounter() {
 
   const fetchContagem = async () => {
     try {
-      // 1. Tenta obter via RPC oficial de estatísticas
+      // 1. Prioridade: Rota de API dinâmica sem cache estático (Next.js force-dynamic + cache: 'no-store')
+      const resp = await fetch('/api/estatisticas', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
+
+      if (resp.ok) {
+        const dadosApi = await resp.json();
+        if (dadosApi.success && typeof dadosApi.total === 'number') {
+          setTotal(dadosApi.total);
+          if (typeof dadosApi.estados === 'number' && dadosApi.estados > 0) {
+            setEstadosAtivos(dadosApi.estados);
+          }
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[SignatureCounter] Falha ao consultar /api/estatisticas, acionando fallback Supabase:', apiErr);
+    }
+
+    try {
+      // 2. Fallback direto via RPC oficial de estatísticas (SECURITY DEFINER)
       const { data, error } = await supabase.rpc('obter_estatisticas_peticao');
       if (!error && data && data.length > 0) {
         setTotal(Number(data[0].total_apoios));
@@ -24,7 +49,7 @@ export default function SignatureCounter() {
         return;
       }
 
-      // 2. Fallback direto via select count
+      // 3. Fallback secundário: select count
       const { count, error: errSelect } = await supabase
         .from('peticao_votos')
         .select('*', { count: 'exact', head: true });
@@ -33,7 +58,7 @@ export default function SignatureCounter() {
         setTotal(count);
       }
     } catch (e) {
-      console.warn('[SignatureCounter] Erro ao carregar contagem:', e);
+      console.warn('[SignatureCounter] Erro ao carregar contagem no fallback:', e);
     } finally {
       setLoading(false);
     }
@@ -41,8 +66,8 @@ export default function SignatureCounter() {
 
   useEffect(() => {
     fetchContagem();
-    // Atualização periódica a cada 20 segundos
-    const interval = setInterval(fetchContagem, 20000);
+    // Atualização periódica a cada 10 segundos em tempo real
+    const interval = setInterval(fetchContagem, 10000);
     return () => clearInterval(interval);
   }, []);
 

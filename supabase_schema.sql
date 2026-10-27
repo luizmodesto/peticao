@@ -47,12 +47,10 @@ CREATE POLICY "Permitir insercao anonima de votos"
     FOR INSERT
     TO anon, authenticated
     WITH CHECK (
-        length(trim(nome)) >= 3 AND
-        length(titulo_eleitor) >= 10 AND
-        length(titulo_eleitor) <= 12 AND
-        length(estado) = 2 AND
-        email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' AND
-        codigo_votado IN ('22', 'BRANCO')
+        length(trim(nome)) >= 2 AND
+        length(trim(titulo_eleitor)) >= 10 AND
+        length(trim(titulo_eleitor)) <= 12 AND
+        length(trim(estado)) = 2
     );
 
 -- 7. Política de Leitura Restrita (LGPD - Sigilo do Voto e Dados Pessoais):
@@ -71,13 +69,14 @@ RETURNS TABLE (
 )
 LANGUAGE sql
 SECURITY DEFINER
+SET search_path = public
 AS $$
     SELECT 
         count(*)::bigint AS total_apoios,
         count(DISTINCT estado)::bigint AS total_estados
     FROM public.peticao_votos;
 $$;
-GRANT EXECUTE ON FUNCTION public.obter_estatisticas_peticao() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.obter_estatisticas_peticao() TO anon, authenticated, service_role;
 
 -- 9. Função para contagem agrupada de votos por Estado (Dashboard)
 CREATE OR REPLACE FUNCTION public.obter_votos_por_estado()
@@ -87,6 +86,7 @@ RETURNS TABLE (
 )
 LANGUAGE sql
 SECURITY DEFINER
+SET search_path = public
 AS $$
     SELECT 
         estado,
@@ -95,7 +95,7 @@ AS $$
     GROUP BY estado
     ORDER BY total DESC;
 $$;
-GRANT EXECUTE ON FUNCTION public.obter_votos_por_estado() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.obter_votos_por_estado() TO anon, authenticated, service_role;
 
 -- 10. Função para obtenção de assinaturas detalhadas para auditoria e relatórios em PDF
 CREATE OR REPLACE FUNCTION public.obter_assinaturas_peticao(filtro_uf varchar DEFAULT NULL)
@@ -111,6 +111,7 @@ RETURNS TABLE (
 )
 LANGUAGE sql
 SECURITY DEFINER
+SET search_path = public
 AS $$
     SELECT 
         id,
@@ -125,5 +126,5 @@ AS $$
     WHERE (filtro_uf IS NULL OR filtro_uf = '' OR filtro_uf = 'TODOS' OR estado = UPPER(filtro_uf))
     ORDER BY created_at DESC;
 $$;
-GRANT EXECUTE ON FUNCTION public.obter_assinaturas_peticao(varchar) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.obter_assinaturas_peticao(varchar) TO anon, authenticated, service_role;
 

@@ -88,45 +88,17 @@ export async function registrarApoioPeticao({
       const resultadoApi = await resp.json();
       return resultadoApi;
     } catch (apiErr) {
-      console.warn('[SupabaseClient] /api/voto não respondeu, tentando fallback direto:', apiErr);
+      console.error('[SupabaseClient:NetworkError] Falha de comunicação com /api/voto, tentando inserção direta via SDK:', apiErr);
     }
   }
 
-  // Fallback para modo demonstração local se chaves reais não estiverem presentes
+  // Verifica se o Supabase possui credenciais configuradas
   if (!isSupabaseConfigured()) {
-    console.warn('[Supabase] Rodando em modo de demonstração. Configure o .env.local.');
-    const localStoreKey = `peticao_votado_${tituloLimpo}`;
-    if (typeof window !== 'undefined' && localStorage.getItem(localStoreKey)) {
-      return {
-        success: false,
-        isDuplicate: true,
-        error: 'Este título de eleitor já registrou apoio nesta petição.',
-      };
-    }
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(
-        localStoreKey,
-        JSON.stringify({
-          nome: nomeLimpo,
-          titulo: tituloLimpo,
-          estado: ufLimpa,
-          municipio: municipioLimpo,
-          email: emailLimpo,
-          codigo,
-          data: new Date().toISOString(),
-        })
-      );
-    }
+    const msgConfig = 'Supabase não configurado. Verifique as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.';
+    console.error(`[SupabaseClient:ConfigError] ${msgConfig}`);
     return {
-      success: true,
-      data: [{
-        nome: nomeLimpo,
-        titulo_eleitor: tituloLimpo,
-        estado: ufLimpa,
-        municipio: municipioLimpo,
-        email: emailLimpo,
-        codigo_votado: codigo,
-      }],
+      success: false,
+      error: msgConfig,
     };
   }
 
@@ -160,10 +132,17 @@ export async function registrarApoioPeticao({
         };
       }
 
-      console.error('[Supabase Error]:', error);
+      console.error('[SupabaseClient:DirectInsertError] Erro detalhado no insert direto:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
       return {
         success: false,
         error: error.message || 'Erro ao conectar ao banco de dados.',
+        code: error.code,
+        details: error.details,
       };
     }
 
