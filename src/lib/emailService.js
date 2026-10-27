@@ -51,6 +51,11 @@ export async function enviarEmailConfirmacaoAssinatura({
   const opcaoTexto = codigoVotado === '22' ? 'Opção 22 (Flávio - PL)' : 'Voto em Branco';
   const dataHoraRegistro = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
+  // Declaração de fé pública e responsabilidade formal solicitada
+  const declaracaoTexto = codigoVotado === '22'
+    ? 'Declara e confirma expressamente, sob as penas da lei e sob sua inteira responsabilidade civil e legal, que as informações prestadas são verídicas e reais, atestando que no dia <strong>25/10/2026</strong>, entre as <strong>08h00 e as 18h00</strong> deste dia, o(a) eleitor(a) qualificado(a) votou no candidato a Presidente <strong>Flávio Bolsonaro</strong>, do partido <strong>PL (Partido Liberal Brasileiro - 22)</strong>.'
+    : 'Declara e confirma expressamente, sob as penas da lei e sob sua inteira responsabilidade civil e legal, que as informações prestadas são verídicas e reais, atestando que no dia <strong>25/10/2026</strong>, entre as <strong>08h00 e as 18h00</strong> deste dia, o(a) eleitor(a) qualificado(a) manifestou seu voto em <strong>BRANCO</strong> na eleição presidencial.';
+
   // Validação estrita do destinatário
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailDestinatario || !emailRegex.test(emailDestinatario)) {
@@ -136,6 +141,18 @@ export async function enviarEmailConfirmacaoAssinatura({
               <span class="label">Autenticidade:</span>
               <span class="value" style="color: #10b981;">Validado por Algoritmo do TSE</span>
             </div>
+          </div>
+
+          <!-- CARD DE DECLARAÇÃO FORMAL DE RESPONSABILIDADE ELEITORAL -->
+          <div style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.5) 0%, rgba(2, 44, 34, 0.7) 100%); border: 1.5px solid #10b981; border-radius: 12px; padding: 18px 20px; margin: 22px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+            <div style="margin-bottom: 8px;">
+              <span style="background: #10b981; color: #022c22; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;">
+                TERMO DE FÉ PÚBLICA & RESPONSABILIDADE
+              </span>
+            </div>
+            <p style="margin: 0; color: #f8fafc; font-size: 13.5px; line-height: 1.6; text-align: justify;">
+              ${declaracaoTexto}
+            </p>
           </div>
 
           <p style="font-size: 12px; color: #94a3b8;">
