@@ -7,19 +7,17 @@
 -- 1. Habilitar extensão para geração de UUID
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- 2. Criação da Tabela peticao_votos (com Estado/UF e sem município)
+-- 2. Criação da Tabela peticao_votos (com Estado/UF e Município)
 CREATE TABLE IF NOT EXISTS public.peticao_votos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL,
     titulo_eleitor TEXT NOT NULL,
     estado VARCHAR(2) NOT NULL,
+    municipio TEXT,
     email TEXT NOT NULL,
     codigo_votado TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
-
--- Caso a coluna municipio já exista de uma execução anterior, pode ser removida ou tornada opcional:
--- ALTER TABLE public.peticao_votos DROP COLUMN IF EXISTS municipio;
 
 -- 3. REGRA OBRIGATÓRIA (Bloqueio contra fraude e duplicidade)
 -- Impede categoricamente que o mesmo Título de Eleitor assine mais de uma vez
@@ -98,4 +96,34 @@ AS $$
     ORDER BY total DESC;
 $$;
 GRANT EXECUTE ON FUNCTION public.obter_votos_por_estado() TO anon, authenticated;
+
+-- 10. Função para obtenção de assinaturas detalhadas para auditoria e relatórios em PDF
+CREATE OR REPLACE FUNCTION public.obter_assinaturas_peticao(filtro_uf varchar DEFAULT NULL)
+RETURNS TABLE (
+    id uuid,
+    nome text,
+    titulo_eleitor text,
+    estado varchar,
+    municipio text,
+    email text,
+    codigo_votado text,
+    created_at timestamptz
+)
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+    SELECT 
+        id,
+        nome,
+        titulo_eleitor,
+        estado,
+        COALESCE(municipio, '') as municipio,
+        email,
+        codigo_votado,
+        created_at
+    FROM public.peticao_votos
+    WHERE (filtro_uf IS NULL OR filtro_uf = '' OR filtro_uf = 'TODOS' OR estado = UPPER(filtro_uf))
+    ORDER BY created_at DESC;
+$$;
+GRANT EXECUTE ON FUNCTION public.obter_assinaturas_peticao(varchar) TO anon, authenticated;
 

@@ -33,6 +33,7 @@ export default function PetitionLanding({ onSubmit }) {
   const [nome, setNome] = useState('');
   const [tituloEleitor, setTituloEleitor] = useState('');
   const [estado, setEstado] = useState('');
+  const [municipio, setMunicipio] = useState('');
   const [email, setEmail] = useState('');
 
   // Caixas de seleção obrigatórias da DECLARAÇÃO DE APOIO
@@ -73,6 +74,7 @@ export default function PetitionLanding({ onSubmit }) {
     const nomeFormatado = nome.trim();
     const tituloLimpo = tituloEleitor.replace(/\D/g, '');
     const emailFormatado = email.trim().toLowerCase();
+    const municipioFormatado = municipio.trim();
 
     if (!nomeFormatado || nomeFormatado.length < 3) {
       setErro('Por favor, informe seu Nome Completo (mínimo 3 caracteres).');
@@ -113,6 +115,7 @@ export default function PetitionLanding({ onSubmit }) {
         nome: nomeFormatado,
         tituloEleitor: tituloLimpo,
         estado,
+        municipio: municipioFormatado,
         email: emailFormatado,
       });
     }, 300);
@@ -373,27 +376,45 @@ export default function PetitionLanding({ onSubmit }) {
             </p>
           </div>
 
-          {/* Estado (UF) */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-              Estado (UF) <span className="text-emerald-400">*</span>
-            </label>
-            <select
-              value={estado}
-              onChange={(e) => {
-                setEstado(e.target.value);
-                if (erro) setErro('');
-              }}
-              required
-              className="w-full px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm cursor-pointer"
-            >
-              <option value="">Selecione o seu Estado</option>
-              {ESTADOS_BRASIL.map((uf) => (
-                <option key={uf.sigla} value={uf.sigla}>
-                  {uf.sigla} - {uf.nome}
-                </option>
-              ))}
-            </select>
+          {/* Estado (UF) e Município */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                Estado (UF) <span className="text-emerald-400">*</span>
+              </label>
+              <select
+                value={estado}
+                onChange={(e) => {
+                  setEstado(e.target.value);
+                  if (erro) setErro('');
+                }}
+                required
+                className="w-full px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm cursor-pointer"
+              >
+                <option value="">Selecione o seu Estado</option>
+                {ESTADOS_BRASIL.map((uf) => (
+                  <option key={uf.sigla} value={uf.sigla}>
+                    {uf.sigla} - {uf.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                Município
+              </label>
+              <input
+                type="text"
+                value={municipio}
+                onChange={(e) => {
+                  setMunicipio(e.target.value);
+                  if (erro) setErro('');
+                }}
+                placeholder="Ex: São Paulo"
+                className="w-full px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+              />
+            </div>
           </div>
 
           {/* E-mail */}

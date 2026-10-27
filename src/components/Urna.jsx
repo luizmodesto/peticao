@@ -79,11 +79,12 @@ export default function Urna({ eleitor, onBack }) {
 
     const audioPromise = urnaAudio.playConfirmaSound();
 
-    // Chamada ao Supabase com Estado (UF)
+    // Chamada ao Supabase com todas as colunas mapeadas
     const resultado = await registrarApoioPeticao({
       nome: eleitor.nome,
       tituloEleitor: eleitor.tituloEleitor,
       estado: eleitor.estado,
+      municipio: eleitor.municipio || '',
       email: eleitor.email,
       codigoVotado: codigoFinal,
     });
@@ -160,7 +161,7 @@ export default function Urna({ eleitor, onBack }) {
               <span>•</span>
               <span className="flex items-center gap-1 text-slate-300">
                 <MapPin className="w-3 h-3 text-emerald-400" />
-                Estado: <strong className="text-white">{eleitor.estado}</strong>
+                {eleitor.municipio ? `${eleitor.municipio} - ` : ''}<strong className="text-white">{eleitor.estado}</strong>
               </span>
             </div>
           </div>

@@ -19,7 +19,12 @@ export const isSupabaseConfigured = () => {
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder-key',
-  { auth: { persistSession: false } }
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  }
 );
 
 /**
@@ -29,6 +34,7 @@ export const supabase = createClient(
  * @param {string} params.nome
  * @param {string} params.tituloEleitor
  * @param {string} params.estado
+ * @param {string} [params.municipio]
  * @param {string} params.email
  * @param {string} params.codigoVotado
  * @returns {Promise<{ success: boolean, data?: any, error?: string, isDuplicate?: boolean }>}
@@ -37,12 +43,14 @@ export async function registrarApoioPeticao({
   nome,
   tituloEleitor,
   estado,
+  municipio = '',
   email,
   codigoVotado,
 }) {
   const tituloLimpo = String(tituloEleitor || '').replace(/\D/g, '');
   const nomeLimpo = String(nome || '').trim();
   const ufLimpa = String(estado || '').trim().toUpperCase();
+  const municipioLimpo = String(municipio || '').trim();
   const emailLimpo = String(email || '').trim().toLowerCase();
   const codigo = String(codigoVotado || '').trim().toUpperCase();
 
@@ -62,7 +70,7 @@ export async function registrarApoioPeticao({
     return { success: false, error: 'Por favor, informe um endereço de e-mail válido.' };
   }
 
-  // Camada 1: Tenta registrar via Backend API Route (executando validação dupla)
+  // Camada 1: Tenta registrar via Backend API Route (executando validação dupla e disparo de e-mail)
   if (typeof window !== 'undefined') {
     try {
       const resp = await fetch('/api/voto', {
@@ -72,6 +80,7 @@ export async function registrarApoioPeticao({
           nome: nomeLimpo,
           tituloEleitor: tituloLimpo,
           estado: ufLimpa,
+          municipio: municipioLimpo,
           email: emailLimpo,
           codigoVotado: codigo,
         }),
@@ -101,6 +110,7 @@ export async function registrarApoioPeticao({
           nome: nomeLimpo,
           titulo: tituloLimpo,
           estado: ufLimpa,
+          municipio: municipioLimpo,
           email: emailLimpo,
           codigo,
           data: new Date().toISOString(),
@@ -113,6 +123,7 @@ export async function registrarApoioPeticao({
         nome: nomeLimpo,
         titulo_eleitor: tituloLimpo,
         estado: ufLimpa,
+        municipio: municipioLimpo,
         email: emailLimpo,
         codigo_votado: codigo,
       }],
@@ -120,7 +131,7 @@ export async function registrarApoioPeticao({
   }
 
   try {
-    // Inserção direta no Supabase (sem .select() para respeitar RLS de escrita pública)
+    // Inserção direta no Supabase (respeitando todas as colunas)
     const { error } = await supabase
       .from('peticao_votos')
       .insert([
@@ -128,6 +139,7 @@ export async function registrarApoioPeticao({
           nome: nomeLimpo,
           titulo_eleitor: tituloLimpo,
           estado: ufLimpa,
+          municipio: municipioLimpo || null,
           email: emailLimpo,
           codigo_votado: codigo,
         },

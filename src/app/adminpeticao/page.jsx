@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import BrazilMap from '@/components/BrazilMap';
+import AdminRelatoriosCard from '@/components/AdminRelatoriosCard';
 import {
   ShieldCheck,
   Lock,
@@ -45,6 +46,7 @@ export default function AdminPeticaoPage() {
   // Estados do Dashboard
   const [totalGeral, setTotalGeral] = useState(0);
   const [votosPorEstado, setVotosPorEstado] = useState({});
+  const [assinaturas, setAssinaturas] = useState([]);
   const [dadosLoading, setDadosLoading] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null);
 
@@ -114,6 +116,25 @@ export default function AdminPeticaoPage() {
             }
           });
         }
+      }
+
+      // 3. Busca detalhada de assinaturas para Relatórios e Auditoria
+      try {
+        const { data: assinaturasData, error: errAssinaturas } = await supabase.rpc('obter_assinaturas_peticao');
+        if (!errAssinaturas && Array.isArray(assinaturasData)) {
+          setAssinaturas(assinaturasData);
+        } else {
+          // Fallback para select direto caso o RPC não responda
+          const { data: directRows } = await supabase
+            .from('peticao_votos')
+            .select('id, nome, titulo_eleitor, estado, email, codigo_votado, created_at')
+            .order('created_at', { ascending: false });
+          if (Array.isArray(directRows)) {
+            setAssinaturas(directRows);
+          }
+        }
+      } catch (errAssin) {
+        console.warn('[Admin Dashboard] Fallback ao carregar assinaturas:', errAssin);
       }
 
       setVotosPorEstado(mapaContagem);
@@ -470,97 +491,111 @@ export default function AdminPeticaoPage() {
             </div>
           </div>
 
-          {/* RANKING POR ESTADO (Leaderboard rolável - 5 ou 4 colunas) */}
-          <div className="lg:col-span-5 xl:col-span-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl flex flex-col">
+          {/* COLUNA DA DIREITA (5 ou 4 colunas): RELATÓRIOS E RANKING */}
+          <div className="lg:col-span-5 xl:col-span-4 space-y-6 flex flex-col">
             
-            <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/80">
-              <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-emerald-400" />
-                  RANKING POR ESTADO
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Classificação por volume de apoios
-                </p>
+            {/* NOVO CAMPO: RELATÓRIO DE ASSINATURAS COM FILTRO POR ESTADO E EXPORTAÇÃO EM PDF */}
+            <AdminRelatoriosCard
+              assinaturas={assinaturas}
+              totalGeral={totalGeral}
+              votosPorEstado={votosPorEstado}
+              isLoading={dadosLoading}
+              onRecarregar={carregarDados}
+            />
+
+            {/* RANKING POR ESTADO (Leaderboard rolável) */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl flex flex-col">
+              
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/80">
+                <div>
+                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-emerald-400" />
+                    RANKING POR ESTADO
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Classificação por volume de apoios
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleExportCSV}
+                  title="Exportar dados em CSV"
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all text-xs flex items-center gap-1"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">CSV</span>
+                </button>
               </div>
 
-              <button
-                onClick={handleExportCSV}
-                title="Exportar dados em CSV"
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all text-xs flex items-center gap-1"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span className="text-[11px]">CSV</span>
-              </button>
-            </div>
+              {/* Lista rolável de estados com Leaderboard */}
+              <div className="overflow-y-auto max-h-[460px] pr-1.5 space-y-2 custom-scrollbar">
+                {rankingEstados.map((item, index) => {
+                  const isLeader = index === 0 && item.total > 0;
+                  const isTop3 = index < 3 && item.total > 0;
 
-            {/* Lista rolável de estados com Leaderboard */}
-            <div className="overflow-y-auto max-h-[460px] pr-1.5 space-y-2 custom-scrollbar">
-              {rankingEstados.map((item, index) => {
-                const isLeader = index === 0 && item.total > 0;
-                const isTop3 = index < 3 && item.total > 0;
+                  return (
+                    <div
+                      key={item.uf}
+                      className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                        isLeader
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-white'
+                          : isTop3
+                          ? 'bg-slate-950/70 border-slate-800 text-slate-200'
+                          : 'bg-slate-950/40 border-slate-800/60 text-slate-300'
+                      }`}
+                    >
+                      {/* Posição e Identificação */}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center flex-shrink-0 ${
+                          index === 0
+                            ? 'bg-yellow-400 text-slate-950 font-black'
+                            : index === 1
+                            ? 'bg-slate-300 text-slate-950 font-black'
+                            : index === 2
+                            ? 'bg-amber-600 text-white font-black'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {index + 1}
+                        </span>
 
-                return (
-                  <div
-                    key={item.uf}
-                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
-                      isLeader
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-white'
-                        : isTop3
-                        ? 'bg-slate-950/70 border-slate-800 text-slate-200'
-                        : 'bg-slate-950/40 border-slate-800/60 text-slate-300'
-                    }`}
-                  >
-                    {/* Posição e Identificação */}
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center flex-shrink-0 ${
-                        index === 0
-                          ? 'bg-yellow-400 text-slate-950 font-black'
-                          : index === 1
-                          ? 'bg-slate-300 text-slate-950 font-black'
-                          : index === 2
-                          ? 'bg-amber-600 text-white font-black'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}>
-                        {index + 1}
-                      </span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                            <span>{item.nome}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-emerald-400 font-mono">
+                              {item.uf}
+                            </span>
+                          </div>
 
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
-                          <span>{item.nome}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-emerald-400 font-mono">
-                            {item.uf}
-                          </span>
+                          {/* Barra de progresso visual do percentual */}
+                          <div className="w-24 sm:w-28 h-1.5 bg-slate-800 rounded-full mt-1 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
+                              style={{ width: `${Math.min(100, Math.max(item.total > 0 ? 3 : 0, Number(item.porcentagem)))}%` }}
+                            />
+                          </div>
                         </div>
+                      </div>
 
-                        {/* Barra de progresso visual do percentual */}
-                        <div className="w-24 sm:w-28 h-1.5 bg-slate-800 rounded-full mt-1 overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
-                            style={{ width: `${Math.min(100, Math.max(item.total > 0 ? 3 : 0, Number(item.porcentagem)))}%` }}
-                          />
+                      {/* Contagem Numérica Alinhada à Direita */}
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-xs sm:text-sm font-black font-mono text-emerald-400">
+                          {item.total.toLocaleString('pt-BR')}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          {item.porcentagem}%
                         </div>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    {/* Contagem Numérica Alinhada à Direita */}
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-xs sm:text-sm font-black font-mono text-emerald-400">
-                        {item.total.toLocaleString('pt-BR')}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        {item.porcentagem}%
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+              <div className="pt-3 mt-3 border-t border-slate-800/80 text-center">
+                <span className="text-[11px] text-slate-400">
+                  Mostrando todos os 27 estados e Distrito Federal
+                </span>
+              </div>
 
-            <div className="pt-3 mt-3 border-t border-slate-800/80 text-center">
-              <span className="text-[11px] text-slate-400">
-                Mostrando todos os 27 estados e Distrito Federal
-              </span>
             </div>
 
           </div>
